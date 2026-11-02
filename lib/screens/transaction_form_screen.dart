@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/category_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../theme/theme.dart';
+
+class TransactionFormScreen extends StatefulWidget {
+  const TransactionFormScreen({super.key});
+
+  @override
+  State<TransactionFormScreen> createState() => _TransactionFormScreenState();
+}
+
+class _TransactionFormScreenState extends State<TransactionFormScreen> {
+  final _amountController = TextEditingController();
+  final _descController = TextEditingController();
+  String? _categoryId;
+  String _type = 'EXPENSE';
+  DateTime _date = DateTime.now();
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      if (mounted) {
+        context.read<CategoryProvider>().loadCategories();
+      }
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _createCategoryDialog() async {
+    final nameController = TextEditingController();
+    String type = _type;
+
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Nueva categoría'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre de la categoría',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                items: const [
+                  DropdownMenuItem(value: 'EXPENSE', child: Text('Gasto')),
+                  DropdownMenuItem(value: 'INCOME', child: Text('Ingreso')),
+                ],
+                onChanged: (v) => setState(() => type = v!),
+                decoration: const InputDecoration(
+                  labelText: 'Tipo',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Crear'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (created == true && nameController.text.isNotEmpty) {
+      if (!mounted) return;
+      final provider = context.read<CategoryProvider>();
+
+      final success = await provider.createCategory(
+        name: nameController.text.trim(),
+        type: type,
+        icon: 'category',
+        color: type == 'EXPENSE' ? '#EF4444' : '#10B981',
+      );
+
+      if (success) {
+        await provider.loadCategories();
+        if (mounted) {
+          setState(() {
+            _categoryId = provider.categories.last.id;
+          });
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.errorMessage ?? 'Error al crear categoría'),
+            backgroundColor: UIColors.destructive,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    if (_categoryId == null || _amountController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa todos los campos')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final provider = context.read<TransactionProvider>();
+
+    final success = await provider.createTransaction(
+      categoryId: _categoryId!,
+      type: _type,
+      amount: double.parse(_amountController.text),
+      description: _descController.text.trim(),
+      date: _date,
+    );
+
+    setState(() => _saving = false);
+
+    if (success && mounted) {
+      Navigator.pop(context);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Error'),
+          backgroundColor: UIColors.destructive,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = context.watch<CategoryProvider>().categories;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Nueva transacción')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'EXPENSE', label: Text('Gasto')),
+                ButtonSegment(value: 'INCOME', label: Text('Ingreso')),
+              ],
+              selected: {_type},
+              onSelectionChanged: (v) => setState(() => _type = v.first),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _categoryId,
+                    items: categories
+                        .map((c) => DropdownMenuItem(
+                      value: c.id,
+                      child: Text(c.name),
+                    ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _categoryId = v),
+                    decoration: const InputDecoration(
+                      labelText: 'Categoría',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: UIColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    tooltip: 'Crear nueva categoría',
+                    onPressed: _createCategoryDialog,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Monto',
+                prefixText: '\$ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(
+                labelText: 'Descripción',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.calendar_today),
+              label: Text('Fecha: ${_date.day}/${_date.month}/${_date.year}'),
+              onPressed: _pickDate,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _saving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Guardar', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
