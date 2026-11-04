@@ -96,6 +96,54 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
+  // Trae los datos más recientes del usuario desde el backend.
+  Future<bool> loadProfile() {
+    return _runRequest(() async {
+      final response = await _apiService.get('/users/me');
+      _user = User.fromJson(response.data);
+    });
+  }
+
+  Future<bool> updateProfile(String name, String currency) {
+    return _runRequest(() async {
+      final response = await _apiService.put('/users/me', data: {
+        'name': name,
+        'currency': currency,
+      });
+      _user = User.fromJson(response.data);
+    });
+  }
+
+  // El backend responde 204 (sin cuerpo), por eso aquí no se modifica _user.
+  Future<bool> changePassword(String current, String newPass) {
+    return _runRequest(() async {
+      await _apiService.put('/users/me/password', data: {
+        'currentPassword': current,
+        'newPassword': newPass,
+      });
+    });
+  }
+
+  // Pasos comunes de las peticiones de perfil: activa isLoading, ejecuta la
+  // petición, guarda el mensaje de error si falla y avisa a la pantalla.
+  Future<bool> _runRequest(Future<void> Function() request) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    var success = false;
+    try {
+      await request();
+      success = true;
+    } catch (e) {
+      _errorMessage = e.toString();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return success;
+  }
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
