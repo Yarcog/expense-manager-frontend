@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/account_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../theme/theme.dart';
@@ -15,6 +17,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   String? _categoryId;
+  String? _accountId;
   String _type = 'EXPENSE';
   DateTime _date = DateTime.now();
   bool _saving = false;
@@ -25,6 +28,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     Future.microtask(() {
       if (mounted) {
         context.read<CategoryProvider>().loadCategories();
+        context.read<AccountProvider>().loadAccounts();
       }
     });
   }
@@ -127,6 +131,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
     setState(() => _saving = true);
     final provider = context.read<TransactionProvider>();
+    final accountProvider = context.read<AccountProvider>();
 
     final success = await provider.createTransaction(
       categoryId: _categoryId!,
@@ -134,7 +139,12 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       amount: double.parse(_amountController.text),
       description: _descController.text.trim(),
       date: _date,
+      accountId: _accountId,
     );
+
+    // No se espera la respuesta: el formulario se cierra de una vez y las
+    // tarjetas del dashboard se actualizan cuando llegue el saldo nuevo.
+    if (success) unawaited(accountProvider.loadAccounts());
 
     setState(() => _saving = false);
 
@@ -153,6 +163,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = context.watch<CategoryProvider>().categories;
+    final accounts = context.watch<AccountProvider>().accounts;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva transacción')),
@@ -202,6 +213,26 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String?>(
+              initialValue: _accountId,
+              isExpanded: true,
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Sin cuenta'),
+                ),
+                ...accounts.map((a) => DropdownMenuItem<String?>(
+                      value: a.id,
+                      child: Text(a.name, overflow: TextOverflow.ellipsis),
+                    )),
+              ],
+              onChanged: (v) => setState(() => _accountId = v),
+              decoration: const InputDecoration(
+                labelText: 'Cuenta',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
