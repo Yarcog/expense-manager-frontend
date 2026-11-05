@@ -131,8 +131,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildMiniStat('Ingresos', _income, UIColors.success),
-                        _buildMiniStat('Gastos', _expense, UIColors.destructive),
+                        Flexible(
+                          child: _buildMiniStat(
+                              'Ingresos', _income, Icons.arrow_downward),
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: _buildMiniStat(
+                              'Gastos', _expense, Icons.arrow_upward),
+                        ),
                       ],
                     ),
                   ],
@@ -192,15 +199,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMiniStat(String title, double amount, Color color) {
+  Widget _buildMiniStat(String title, double amount, IconData icon) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         const SizedBox(height: 4),
-        Text(
-          Formatters.money(amount),
-          style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold),
+        // Los montos muy largos se reducen en vez de desbordar la tarjeta.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+              Text(
+                Formatters.money(amount),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
