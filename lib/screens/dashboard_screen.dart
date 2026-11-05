@@ -7,10 +7,14 @@ import '../utils/formatters.dart';
 import '../theme/theme.dart';
 import '../components/accounts_section.dart';
 import '../components/custom_card.dart';
+import '../components/recent_transactions.dart';
 import '../components/weekly_expense_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// Se llama al tocar "Ver todo" en "Últimas transacciones".
+  final VoidCallback? onViewAllTransactions;
+
+  const DashboardScreen({super.key, this.onViewAllTransactions});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -93,7 +97,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        // El espacio de abajo evita que el botón "+" tape la última transacción.
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -174,7 +179,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    return WeeklyExpenseChart(transactions: provider.transactions);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WeeklyExpenseChart(transactions: provider.transactions),
+        const SizedBox(height: 24),
+        RecentTransactions(
+          transactions: provider.transactions,
+          onViewAll: widget.onViewAllTransactions,
+        ),
+      ],
+    );
   }
 
   Widget _buildMiniStat(String title, double amount, Color color) {

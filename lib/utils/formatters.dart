@@ -14,6 +14,10 @@ class Formatters {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
+  static String shortDate(DateTime date) {
+    return DateFormat('dd/MM/yy').format(date);
+  }
+
   static String dateTime(DateTime date) {
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
   }
