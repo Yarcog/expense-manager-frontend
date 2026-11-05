@@ -13,13 +13,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const int _transactionsTabIndex = 1;
   static const int _categoriesTabIndex = 2;
   static const int _profileTabIndex = 3;
 
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(
+      onViewAllTransactions: () =>
+          setState(() => _currentIndex = _transactionsTabIndex),
+    ),
     const TransactionsScreen(),
     const CategoriesScreen(),
     const ProfileScreen(),
