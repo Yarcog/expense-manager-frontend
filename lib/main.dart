@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'providers/account_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/transaction_provider.dart';
@@ -19,6 +20,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
+        ChangeNotifierProvider(create: (_) => AccountProvider()),
       ],
       child: const MyApp(),
     ),
