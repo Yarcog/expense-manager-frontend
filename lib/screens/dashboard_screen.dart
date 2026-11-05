@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/auth_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
 import '../theme/theme.dart';
@@ -21,6 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _income = 0;
   double _expense = 0;
   double _balance = 0;
+  late final TransactionProvider _transactions;
+  late int _seenChangeCount;
 
   // Datos simulados para el gráfico de barras (luego los conectamos al backend)
   final List<FlSpot> _expenseSpots = [
@@ -32,17 +35,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _transactions = context.read<TransactionProvider>();
+    _seenChangeCount = _transactions.changeCount;
+    _transactions.addListener(_onTransactionsChanged);
     Future.microtask(() {
       if (mounted) _loadSummary();
     });
   }
 
-  Future<void> _loadSummary() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _transactions.removeListener(_onTransactionsChanged);
+    super.dispose();
+  }
+
+  void _onTransactionsChanged() {
+    if (_transactions.changeCount == _seenChangeCount) return;
+    _seenChangeCount = _transactions.changeCount;
+    _loadSummary(showSpinner: false);
+  }
+
+  // Al actualizar no se muestra el indicador de carga: reemplazaría todo el
+  // contenido y la pantalla saltaría, además de volver a crear "Mis cuentas".
+  Future<void> _loadSummary({bool showSpinner = true}) async {
+    if (showSpinner) setState(() => _loading = true);
     final messenger = ScaffoldMessenger.of(context); // ✅ Capturado antes
     try {
       final response = await _api.get('/reports/summary');
       final data = response.data;
+      if (!mounted) return;
 
       setState(() {
         _income = (data['totalIncome'] as num).toDouble();
@@ -51,12 +72,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      if (mounted) {
-        messenger.showSnackBar( // ✅ Usa el messenger capturado
-          SnackBar(content: Text('Error: $e'), backgroundColor: UIColors.destructive),
-        );
-      }
+      messenger.showSnackBar( // ✅ Usa el messenger capturado
+        SnackBar(content: Text('Error: $e'), backgroundColor: UIColors.destructive),
+      );
     }
   }
 

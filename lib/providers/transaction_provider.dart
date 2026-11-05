@@ -8,6 +8,11 @@ class TransactionProvider extends ChangeNotifier {
   List<Transaction> _transactions = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _changeCount = 0;
+
+  /// Aumenta cada vez que se crea o elimina una transacción. Le permite a otras
+  /// pantallas saber cuándo recalcular, sin reaccionar a una simple recarga.
+  int get changeCount => _changeCount;
 
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
@@ -51,6 +56,7 @@ class TransactionProvider extends ChangeNotifier {
 
       final newTransaction = Transaction.fromJson(response.data);
       _transactions.insert(0, newTransaction);
+      _changeCount++;
       notifyListeners();
       return true;
     } catch (e) {
@@ -64,6 +70,7 @@ class TransactionProvider extends ChangeNotifier {
     try {
       await _api.delete('/transactions/$id');
       _transactions.removeWhere((t) => t.id == id);
+      _changeCount++;
       notifyListeners();
       return true;
     } catch (e) {
