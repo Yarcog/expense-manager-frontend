@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
 import '../theme/theme.dart';
+import '../components/accounts_section.dart';
 import '../components/custom_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -120,6 +121,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+
+            const AccountsSection(),
             const SizedBox(height: 24),
 
             // 🎯 Gráfico de Barras (Evolución)
