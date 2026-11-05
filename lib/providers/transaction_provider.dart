@@ -7,6 +7,7 @@ class TransactionProvider extends ChangeNotifier {
 
   List<Transaction> _transactions = [];
   bool _isLoading = false;
+  bool _loadFailed = false;
   String? _errorMessage;
   int _changeCount = 0;
 
@@ -18,6 +19,10 @@ class TransactionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// Indica si falló la carga de la lista. Sirve para no confundir
+  /// "no se pudo cargar" con "no tienes transacciones".
+  bool get loadFailed => _loadFailed;
+
   Future<void> loadTransactions() async {
     _isLoading = true;
     _errorMessage = null;
@@ -28,8 +33,10 @@ class TransactionProvider extends ChangeNotifier {
       _transactions = (response.data as List)
           .map((json) => Transaction.fromJson(json))
           .toList();
+      _loadFailed = false;
     } catch (e) {
       _errorMessage = e.toString();
+      _loadFailed = true;
     }
 
     _isLoading = false;
