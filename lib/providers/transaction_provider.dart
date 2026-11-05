@@ -37,6 +37,7 @@ class TransactionProvider extends ChangeNotifier {
     required double amount,
     required String description,
     required DateTime date,
+    String? accountId,
   }) async {
     try {
       final response = await _api.post('/transactions', data: {
@@ -45,6 +46,7 @@ class TransactionProvider extends ChangeNotifier {
         'amount': amount,
         'description': description,
         'date': date.toIso8601String(),
+        'accountId': ?accountId,
       });
 
       final newTransaction = Transaction.fromJson(response.data);
