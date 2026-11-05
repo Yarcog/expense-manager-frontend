@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/account_provider.dart';
 import '../providers/category_provider.dart';
@@ -14,6 +15,10 @@ class TransactionFormScreen extends StatefulWidget {
 }
 
 class _TransactionFormScreenState extends State<TransactionFormScreen> {
+  // Hasta dos decimales. Al no aceptar "1.000" se evita que se guarde como 1
+  // en vez de mil.
+  static final _amountPattern = RegExp(r'^\d*[.,]?\d{0,2}$');
+
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   String? _categoryId;
@@ -129,6 +134,17 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
       return;
     }
 
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Escribe un monto mayor que cero, sin puntos de miles'),
+          backgroundColor: UIColors.destructive,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     final provider = context.read<TransactionProvider>();
     final accountProvider = context.read<AccountProvider>();
@@ -136,7 +152,7 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     final success = await provider.createTransaction(
       categoryId: _categoryId!,
       type: _type,
-      amount: double.parse(_amountController.text),
+      amount: amount,
       description: _descController.text.trim(),
       date: _date,
       accountId: _accountId,
@@ -237,7 +253,15 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _amountController,
-              keyboardType: TextInputType.number,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                TextInputFormatter.withFunction(
+                  (oldValue, newValue) => _amountPattern.hasMatch(newValue.text)
+                      ? newValue
+                      : oldValue,
+                ),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Monto',
                 prefixText: '\$ ',
