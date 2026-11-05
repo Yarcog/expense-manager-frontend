@@ -115,7 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Balance Total',
+                      'Balance del mes',
                       style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 8),

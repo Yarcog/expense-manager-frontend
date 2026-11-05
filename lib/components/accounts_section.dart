@@ -81,17 +81,45 @@ class _AccountsSectionState extends State<AccountsSection> {
     // La altura crece con el tamaño de letra del teléfono para que el
     // contenido de la tarjeta siempre quepa.
     final height = MediaQuery.textScalerOf(context).scale(_cardHeight);
+    // Mientras cargan o si falló la carga no se muestra el total: diría
+    // "$ 0" sin saberlo, o una suma con saldos desactualizados.
+    final showTotal =
+        !provider.loadFailed && !(provider.isLoading && accounts.isEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Mis cuentas',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: UIColors.foreground,
-          ),
+        Row(
+          children: [
+            const Text(
+              'Mis cuentas',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: UIColors.foreground,
+              ),
+            ),
+            if (showTotal) ...[
+              const SizedBox(width: 12),
+              // Los totales muy largos se reducen en vez de cortarse.
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Total: ${Formatters.money(
+                      accounts.fold<double>(0, (sum, a) => sum + a.balance),
+                    )}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: UIColors.foreground,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 16),
         if (provider.loadFailed) ...[
