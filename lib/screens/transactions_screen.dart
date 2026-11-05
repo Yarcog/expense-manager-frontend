@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/account_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../utils/formatters.dart';
 import '../theme/theme.dart';
@@ -64,6 +65,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                   ),
                   onLongPress: () async {
+                    final accountProvider = context.read<AccountProvider>();
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (_) => AlertDialog(
@@ -82,7 +84,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       ),
                     );
                     if (confirm == true && mounted) {
-                      await provider.deleteTransaction(t.id);
+                      final success = await provider.deleteTransaction(t.id);
+                      if (success) await accountProvider.loadAccounts();
                     }
                   },
                 );
