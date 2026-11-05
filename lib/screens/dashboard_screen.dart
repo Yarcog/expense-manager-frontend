@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../providers/auth_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../services/api_service.dart';
@@ -8,6 +7,7 @@ import '../utils/formatters.dart';
 import '../theme/theme.dart';
 import '../components/accounts_section.dart';
 import '../components/custom_card.dart';
+import '../components/weekly_expense_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,13 +24,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _balance = 0;
   late final TransactionProvider _transactions;
   late int _seenChangeCount;
-
-  // Datos simulados para el gráfico de barras (luego los conectamos al backend)
-  final List<FlSpot> _expenseSpots = [
-    const FlSpot(0, 3), const FlSpot(1, 1), const FlSpot(2, 4),
-    const FlSpot(3, 2), const FlSpot(4, 5), const FlSpot(5, 1),
-    const FlSpot(6, 4),
-  ];
 
   @override
   void initState() {
@@ -146,57 +139,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const AccountsSection(),
             const SizedBox(height: 24),
 
-            // 🎯 Gráfico de Barras (Evolución)
-            Text(
-              'Evolución de Gastos',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: UIColors.foreground),
-            ),
-            const SizedBox(height: 16),
-            CustomCard(
-              child: Container(
-                height: 200,
-                padding: const EdgeInsets.all(16),
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: 6,
-                    barGroups: List.generate(7, (index) {
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: _expenseSpots[index].y,
-                            color: UIColors.primary,
-                            width: 16,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ],
-                      );
-                    }),
-                    titlesData: FlTitlesData(
-                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-                            return Text(days[value.toInt()], style: const TextStyle(fontSize: 12));
-                          },
-                        ),
-                      ),
-                    ),
-                    gridData: const FlGridData(show: false),
-                    borderData: FlBorderData(show: false),
-                  ),
-                ),
-              ),
-            ),
+            _buildTransactionSections(),
           ],
         ),
       ),
     );
+  }
+
+  // Mientras cargan o si falló la carga no se muestran las secciones: dirían
+  // "no tienes gastos" sin saberlo, o enseñarían datos de la sesión anterior.
+  Widget _buildTransactionSections() {
+    final provider = context.watch<TransactionProvider>();
+
+    if (provider.isLoading) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (provider.loadFailed) {
+      return Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'No se pudieron cargar tus transacciones',
+              style: TextStyle(color: UIColors.destructive),
+            ),
+          ),
+          TextButton(
+            onPressed: provider.loadTransactions,
+            child: const Text('Reintentar'),
+          ),
+        ],
+      );
+    }
+
+    return WeeklyExpenseChart(transactions: provider.transactions);
   }
 
   Widget _buildMiniStat(String title, double amount, Color color) {
