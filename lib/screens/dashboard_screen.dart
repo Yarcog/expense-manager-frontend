@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../providers/auth_provider.dart';
+import '../providers/transaction_provider.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
 import '../theme/theme.dart';
+import '../components/accounts_section.dart';
 import '../components/custom_card.dart';
+import '../components/recent_transactions.dart';
+import '../components/weekly_expense_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// Se llama al tocar "Ver todo" en "Últimas transacciones".
+  final VoidCallback? onViewAllTransactions;
+
+  const DashboardScreen({super.key, this.onViewAllTransactions});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -20,28 +26,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _income = 0;
   double _expense = 0;
   double _balance = 0;
-
-  // Datos simulados para el gráfico de barras (luego los conectamos al backend)
-  final List<FlSpot> _expenseSpots = [
-    const FlSpot(0, 3), const FlSpot(1, 1), const FlSpot(2, 4),
-    const FlSpot(3, 2), const FlSpot(4, 5), const FlSpot(5, 1),
-    const FlSpot(6, 4),
-  ];
+  late final TransactionProvider _transactions;
+  late int _seenChangeCount;
 
   @override
   void initState() {
     super.initState();
+    _transactions = context.read<TransactionProvider>();
+    _seenChangeCount = _transactions.changeCount;
+    _transactions.addListener(_onTransactionsChanged);
     Future.microtask(() {
       if (mounted) _loadSummary();
     });
   }
 
-  Future<void> _loadSummary() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _transactions.removeListener(_onTransactionsChanged);
+    super.dispose();
+  }
+
+  void _onTransactionsChanged() {
+    if (_transactions.changeCount == _seenChangeCount) return;
+    _seenChangeCount = _transactions.changeCount;
+    _loadSummary(showSpinner: false);
+  }
+
+  // Al actualizar no se muestra el indicador de carga: reemplazaría todo el
+  // contenido y la pantalla saltaría, además de volver a crear "Mis cuentas".
+  Future<void> _loadSummary({bool showSpinner = true}) async {
+    if (showSpinner) setState(() => _loading = true);
     final messenger = ScaffoldMessenger.of(context); // ✅ Capturado antes
     try {
       final response = await _api.get('/reports/summary');
       final data = response.data;
+      if (!mounted) return;
 
       setState(() {
         _income = (data['totalIncome'] as num).toDouble();
@@ -50,12 +69,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      if (mounted) {
-        messenger.showSnackBar( // ✅ Usa el messenger capturado
-          SnackBar(content: Text('Error: $e'), backgroundColor: UIColors.destructive),
-        );
-      }
+      messenger.showSnackBar( // ✅ Usa el messenger capturado
+        SnackBar(content: Text('Error: $e'), backgroundColor: UIColors.destructive),
+      );
     }
   }
 
@@ -79,7 +97,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        // El espacio de abajo evita que el botón "+" tape la última transacción.
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -96,7 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Balance Total',
+                      'Balance del mes',
                       style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 8),
@@ -112,8 +131,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildMiniStat('Ingresos', _income, UIColors.success),
-                        _buildMiniStat('Gastos', _expense, UIColors.destructive),
+                        Flexible(
+                          child: _buildMiniStat(
+                              'Ingresos', _income, Icons.arrow_downward),
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: _buildMiniStat(
+                              'Gastos', _expense, Icons.arrow_upward),
+                        ),
                       ],
                     ),
                   ],
@@ -122,68 +148,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 🎯 Gráfico de Barras (Evolución)
-            Text(
-              'Evolución de Gastos',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: UIColors.foreground),
-            ),
-            const SizedBox(height: 16),
-            CustomCard(
-              child: Container(
-                height: 200,
-                padding: const EdgeInsets.all(16),
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: 6,
-                    barGroups: List.generate(7, (index) {
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: _expenseSpots[index].y,
-                            color: UIColors.primary,
-                            width: 16,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ],
-                      );
-                    }),
-                    titlesData: FlTitlesData(
-                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-                            return Text(days[value.toInt()], style: const TextStyle(fontSize: 12));
-                          },
-                        ),
-                      ),
-                    ),
-                    gridData: const FlGridData(show: false),
-                    borderData: FlBorderData(show: false),
-                  ),
-                ),
-              ),
-            ),
+            const AccountsSection(),
+            const SizedBox(height: 24),
+
+            _buildTransactionSections(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMiniStat(String title, double amount, Color color) {
+  // Mientras cargan o si falló la carga no se muestran las secciones: dirían
+  // "no tienes gastos" sin saberlo, o enseñarían datos de la sesión anterior.
+  Widget _buildTransactionSections() {
+    final provider = context.watch<TransactionProvider>();
+
+    if (provider.isLoading) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (provider.loadFailed) {
+      return Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'No se pudieron cargar tus transacciones',
+              style: TextStyle(color: UIColors.destructive),
+            ),
+          ),
+          TextButton(
+            onPressed: provider.loadTransactions,
+            child: const Text('Reintentar'),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WeeklyExpenseChart(transactions: provider.transactions),
+        const SizedBox(height: 24),
+        RecentTransactions(
+          transactions: provider.transactions,
+          onViewAll: widget.onViewAllTransactions,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStat(String title, double amount, IconData icon) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         const SizedBox(height: 4),
-        Text(
-          Formatters.money(amount),
-          style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold),
+        // Los montos muy largos se reducen en vez de desbordar la tarjeta.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+              Text(
+                Formatters.money(amount),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
