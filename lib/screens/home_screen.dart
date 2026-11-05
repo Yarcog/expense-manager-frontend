@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const int _categoriesTabIndex = 2;
   static const int _profileTabIndex = 3;
 
   int _currentIndex = 0;
@@ -61,7 +62,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: _currentIndex == _profileTabIndex
+      // Categorías tiene su propio botón "+" y Perfil no necesita ninguno.
+      floatingActionButton: _currentIndex == _categoriesTabIndex ||
+              _currentIndex == _profileTabIndex
           ? null
           : FloatingActionButton(
               onPressed: () async {
